@@ -9,10 +9,12 @@
 
 #include "vex.h"
 
-using namespace vex;
+#include "bot.hpp"
+#include "auton.hpp"
+#include "buttons.hpp"
 
-// A global instance of competition
-competition Competition;
+using namespace vex;
+using namespace bot;
 
 // define your global instances of motors and other devices here
 
@@ -27,6 +29,7 @@ competition Competition;
 /*---------------------------------------------------------------------------*/
 
 void pre_auton(void) {
+    bot::sensors::imu.calibrate();
 
   // All activities that occur before the competition starts
   // Example: clearing encoders, setting servo positions, ...
@@ -59,19 +62,59 @@ void autonomous(void) {
 /*---------------------------------------------------------------------------*/
 
 void usercontrol(void) {
-  // User control code here, inside the loop
+
+  bot::Controller1.ButtonL1.pressed(bot::buttons::ButtonL1);
+  bot::Controller1.ButtonL1.released(bot::buttons::ButtonL1_released);
+  bot::Controller1.ButtonL2.pressed(bot::buttons::ButtonL2);
+  bot::Controller1.ButtonL2.released(bot::buttons::ButtonL2_released);
+  bot::Controller1.ButtonR1.pressed(bot::buttons::ButtonR1);
+  bot::Controller1.ButtonR1.released(bot::buttons::ButtonR1_released);
+  bot::Controller1.ButtonR2.pressed(bot::buttons::ButtonR2);
+  bot::Controller1.ButtonR2.released(bot::buttons::ButtonR2_released);
+
+  bot::Controller1.ButtonA.pressed(bot::buttons::ButtonA);
+  bot::Controller1.ButtonB.pressed(bot::buttons::ButtonB);
+  bot::Controller1.ButtonX.pressed(bot::buttons::ButtonX);
+  bot::Controller1.ButtonY.pressed(bot::buttons::ButtonY);
+
+  bot::Controller1.ButtonLeft.pressed(bot::buttons::ButtonLeft);
+  bot::Controller1.ButtonRight.pressed(bot::buttons::ButtonRight);
+  bot::Controller1.ButtonDown.pressed(bot::buttons::ButtonDown);
+  bot::Controller1.ButtonUp.pressed(bot::buttons::ButtonUp);
+  
+  // variables for driver control
+  double leftY, leftX, rightY, rightX;
+  double left_joystick, right_joystick;
+  double left, right;
+
   while (1) {
-    // This is the main execution loop for the user control program.
-    // Each time through the loop your program should update motor + servo
-    // values based on feedback from the joysticks.
+    leftY = bot::Controller1.Axis3.position();
+    leftX = bot::Controller1.Axis4.position();
+    rightY = bot::Controller1.Axis2.position();
+    rightX = bot::Controller1.Axis1.position();
 
-    // ........................................................................
-    // Insert user code here. This is where you use the joystick values to
-    // update your motors, etc.
-    // ........................................................................
+    // calculate joystick magnitudes
+    left_joystick = sqrt(leftY * leftY + leftX * leftX);
+    right_joystick = sqrt(rightY * rightY + rightX * rightX);
 
-    wait(20, msec); // Sleep the task for a short amount of time to
-                    // prevent wasted resources.
+
+    left_joystick = math::curve(left_joystick);
+    right_joystick = math::curve(right_joystick);
+
+    // deadzone adjustment
+    if (fabs(left_joystick) < CONTROLLER_DEADZONE) left_joystick = 0.0;
+    if (fabs(right_joystick) < CONTROLLER_DEADZONE) right_joystick = 0.0;
+     
+    left = (leftY < 0) ? -left_joystick : left_joystick;
+    right = (rightY < 0) ? -right_joystick : right_joystick;
+
+    left = math::clamp(left, -100, 100);
+    right = math::clamp(right, -100, 100);
+
+    bot::drivetrains::dt.tank_drive(left, right);
+
+    vex::task::sleep(20); // Sleep the task for a short amount of time to
+                          // prevent wasted resources.
   }
 }
 
@@ -80,8 +123,8 @@ void usercontrol(void) {
 //
 int main() {
   // Set up callbacks for autonomous and driver control periods.
-  Competition.autonomous(autonomous);
-  Competition.drivercontrol(usercontrol);
+  bot::Competition.autonomous(autonomous);
+  bot::Competition.drivercontrol(usercontrol);
 
   // Run the pre-autonomous function.
   pre_auton();
