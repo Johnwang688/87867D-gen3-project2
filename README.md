@@ -1,4 +1,4 @@
-# BOT4 - VEX V5 Competition Robot
+# VEX V5 robot program for team 87867D, BOT4, version 2 
 
 A VEX V5 competition robot control system featuring tank drive, PID-based autonomous navigation, Pure Pursuit path following, and Monte Carlo Localization using distance sensors.
 
