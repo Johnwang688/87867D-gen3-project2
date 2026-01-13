@@ -79,7 +79,10 @@ void Drivetrain::turn_to_heading(double heading, double timeout, double speed_li
     _left_motor.setStopping(vex::brakeType::brake);
     _right_motor.setStopping(vex::brakeType::brake);
 
-    double targetHeading = heading;
+    // convert heading from user convention (0° = +Y) to code convention (0° = +X)
+    double targetHeading = heading + 90.0;
+    if (targetHeading > 180.0) targetHeading -= 360.0;
+    if (targetHeading <= -180.0) targetHeading += 360.0;
 
     _left_turn_pid.reset();
     double lastOutput = 0.0;
@@ -102,8 +105,7 @@ void Drivetrain::turn_to_heading(double heading, double timeout, double speed_li
 
         _left_motor.spin(forward, output, percent);
         _right_motor.spin(reverse, output, percent);
-
-        // Exit when within 1 degree of target
+        
         if (std::abs(error) < 1.0) {
             _left_motor.stop();
             _right_motor.stop();

@@ -30,7 +30,7 @@ using namespace bot;
 
 void pre_auton(void) {
     bot::sensors::imu.calibrate();
-
+    return;
   // All activities that occur before the competition starts
   // Example: clearing encoders, setting servo positions, ...
 }
@@ -63,6 +63,17 @@ void autonomous(void) {
 
 void usercontrol(void) {
 
+  bot::sensors::imu.calibrate();
+  vex::task::sleep(500);
+  
+  // Debug: Print IMU heading after calibration
+  printf("IMU heading after calibration: %.2f\n", bot::sensors::imu.get_heading());
+  
+  bot::mcl::location.reset(300, -1200, 0);
+  bot::mcl::location.start();
+
+  //bot::pistons::toggle_arm_piston();
+
   bot::Controller1.ButtonL1.pressed(bot::buttons::ButtonL1);
   bot::Controller1.ButtonL1.released(bot::buttons::ButtonL1_released);
   bot::Controller1.ButtonL2.pressed(bot::buttons::ButtonL2);
@@ -76,6 +87,7 @@ void usercontrol(void) {
   bot::Controller1.ButtonB.pressed(bot::buttons::ButtonB);
   bot::Controller1.ButtonX.pressed(bot::buttons::ButtonX);
   bot::Controller1.ButtonY.pressed(bot::buttons::ButtonY);
+  bot::Controller1.ButtonY.released(bot::buttons::ButtonY_released);
 
   bot::Controller1.ButtonLeft.pressed(bot::buttons::ButtonLeft);
   bot::Controller1.ButtonRight.pressed(bot::buttons::ButtonRight);

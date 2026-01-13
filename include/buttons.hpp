@@ -33,6 +33,7 @@ namespace bot {
         void ButtonR2_released();
         void ButtonX();
         void ButtonY();
+        void ButtonY_released();
         void ButtonA();
         void ButtonB();
         void ButtonLeft();

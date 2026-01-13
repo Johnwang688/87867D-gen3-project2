@@ -1,4 +1,5 @@
 #include "buttons.hpp"
+#include "location_debug.hpp"
 #include <vector>
 
 namespace bot {
@@ -94,15 +95,22 @@ namespace bot {
 
         void ButtonL1(){
             bot::pistons::toggle_arm_piston();
+            //bot::motors::upper.spin(vex::forward, 100, vex::percent);
+            //bot::motors::mid.spin(vex::forward, 50, vex::percent);
         }
         void ButtonL1_released(){
-
+            //bot::motors::upper.stop();
+            //bot::motors::mid.stop();
         }
         void ButtonL2(){
             bot::intake_methods::score_upper();
+            //bot::motors::upper.spin(vex::reverse, 100, vex::percent);
+            //bot::motors::mid.spin(vex::reverse, 50, vex::percent);
         }
         void ButtonL2_released(){
             bot::intake_methods::stop_scoring_upper();
+            //bot::motors::upper.stop();
+            //bot::motors::mid.stop();
         }
         void ButtonR1(){
             bot::intake_methods::intake();
@@ -121,21 +129,27 @@ namespace bot {
         }
         void ButtonY(){
             bot::intake_methods::toggle_middle_score();
+            //bot::intake_methods::score_middle();
+            //bot::intake_methods::intake();
+        }
+        void ButtonY_released(){
+            //bot::intake_methods::stop_scoring_middle();
+            //bot::intake_methods::stop_intaking();
         }
         void ButtonA(){
-
+            debug::print_sensor_data();
         }
         void ButtonB(){
             bot::pistons::toggle_match_load_piston();
         }
         void ButtonLeft(){
-
+            debug::print_location();
         }
         void ButtonRight(){
 
         }
         void ButtonDown(){
-
+            //bot::pistons::toggle_arm_piston();
         }
         void ButtonUp(){
             

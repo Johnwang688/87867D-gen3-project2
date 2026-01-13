@@ -48,29 +48,29 @@ constexpr std::uint16_t INITIAL_STEP_SIZE = 800;
 constexpr std::uint16_t MAX_PARTICLES = 22 * (LAYERS-1);
 
 // Robot dimensions and offsets (in mm)
-constexpr std::int16_t LEFT_FORWARD_OFFSET_X = 0;
-constexpr std::int16_t LEFT_FORWARD_OFFSET_Y = 0;
-constexpr std::int16_t RIGHT_FORWARD_OFFSET_X = 0;
-constexpr std::int16_t RIGHT_FORWARD_OFFSET_Y = 0;
+constexpr std::int16_t LEFT_FORWARD_OFFSET_X = -135;
+constexpr std::int16_t LEFT_FORWARD_OFFSET_Y = 88;
+constexpr std::int16_t RIGHT_FORWARD_OFFSET_X = 146;
+constexpr std::int16_t RIGHT_FORWARD_OFFSET_Y = 92;
 
-constexpr std::int16_t LEFT_AFT_OFFSET_X = 0;
-constexpr std::int16_t LEFT_AFT_OFFSET_Y = 0;
-constexpr std::int16_t RIGHT_AFT_OFFSET_X = 0;
-constexpr std::int16_t RIGHT_AFT_OFFSET_Y = 0;
+constexpr std::int16_t LEFT_AFT_OFFSET_X = -141;
+constexpr std::int16_t LEFT_AFT_OFFSET_Y = 10;
+constexpr std::int16_t RIGHT_AFT_OFFSET_X = 135;
+constexpr std::int16_t RIGHT_AFT_OFFSET_Y = -30;
 
-constexpr std::int16_t FRONT_LEFT_OFFSET_X = 0;
-constexpr std::int16_t FRONT_LEFT_OFFSET_Y = 0;
-constexpr std::int16_t FRONT_RIGHT_OFFSET_X = 0;
-constexpr std::int16_t FRONT_RIGHT_OFFSET_Y = 0;
+constexpr std::int16_t FRONT_LEFT_OFFSET_X = -133;
+constexpr std::int16_t FRONT_LEFT_OFFSET_Y = 155;
+constexpr std::int16_t FRONT_RIGHT_OFFSET_X = 133;
+constexpr std::int16_t FRONT_RIGHT_OFFSET_Y = 155;
 
-constexpr std::int16_t BACK_LEFT_OFFSET_X = 0;
-constexpr std::int16_t BACK_LEFT_OFFSET_Y = 0;
-constexpr std::int16_t BACK_RIGHT_OFFSET_X = 0;
-constexpr std::int16_t BACK_RIGHT_OFFSET_Y = 0;
+constexpr std::int16_t BACK_LEFT_OFFSET_X = -100;
+constexpr std::int16_t BACK_LEFT_OFFSET_Y = -134;
+constexpr std::int16_t BACK_RIGHT_OFFSET_X = 100;
+constexpr std::int16_t BACK_RIGHT_OFFSET_Y = -134;
 
 // field dimensions (in mm)
-constexpr std::int16_t WIDTH = 3658;
-constexpr std::int16_t HEIGHT = 3658;
+constexpr std::int16_t WIDTH = 3560;
+constexpr std::int16_t HEIGHT = 3560;
 constexpr std::int16_t OUT_OF_BOUNDS = WIDTH/2;
 
 // All units in mm. Origin (0,0) is center.
@@ -80,14 +80,14 @@ constexpr Line map[] = {
     { WIDTH/2,  HEIGHT/2, -WIDTH/2,  HEIGHT/2}, {-WIDTH/2,  HEIGHT/2, -WIDTH/2, -HEIGHT/2},
 
     // 2. West Long Goal "V" Legs
-    {-1500, -300, -HEIGHT/2,    0}, // Leg 1
-    {-1500,  300, -HEIGHT/2,    0}, // Leg 2
+    //{-1500, -300, -HEIGHT/2,    0}, // Leg 1
+    //{-1500,  300, -HEIGHT/2,    0}, // Leg 2
 
     // 3. East Long Goal "V" Legs
-    { 1500, -300,  HEIGHT/2,    0}, // Leg 1
-    { 1500,  300,  HEIGHT/2,    0}, // Leg 2
+    //{ 1500, -300,  HEIGHT/2,    0}, // Leg 1
+    //{ 1500,  300,  HEIGHT/2,    0}, // Leg 2
 
     // 4. Center Goal Vertical Supports (Parallel Lines)
-    {-150,  300,  150,  300}, // Center Goal North Support
-    {-150, -300,  150, -300}  // Center Goal South Support
+    //{-150,  300,  150,  300}, // Center Goal North Support
+    //{-150, -300,  150, -300}  // Center Goal South Support
 };

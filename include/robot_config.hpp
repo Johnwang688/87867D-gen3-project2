@@ -55,6 +55,12 @@ namespace bot {
                 
                     double avg_heading = -atan2(avg_y, avg_x) * 180.0 / M_PI;
                     
+                    avg_heading += 90.0;
+                    
+                    // Normalize to -180 to 180
+                    if (avg_heading > 180.0) avg_heading -= 360.0;
+                    if (avg_heading <= -180.0) avg_heading += 360.0;
+                    
                     return avg_heading;
                 }
 

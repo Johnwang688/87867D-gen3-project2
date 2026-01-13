@@ -19,7 +19,7 @@ namespace bot {
 		vex::motor_group all = vex::motor_group(leftA, leftB, leftC, rightA, rightB, rightC);
 
 		vex::motor upper = vex::motor(vex::PORT2, vex::ratio18_1, true);
-		vex::motor mid = vex::motor(vex::PORT17, vex::ratio18_1, false);
+		vex::motor mid = vex::motor(vex::PORT16, vex::ratio18_1, false);
 		vex::motor lower = vex::motor(vex::PORT3, vex::ratio6_1, false);
 		vex::motor_group intake = vex::motor_group(upper, mid, lower);
 	}
@@ -31,12 +31,12 @@ namespace bot {
 
 		vex::distance left_distance_forward = vex::distance(vex::PORT12);
 		vex::distance left_distance_aft = vex::distance(vex::PORT13);
-		vex::distance right_distance_forward = vex::distance(vex::PORT14);
-		vex::distance right_distance_aft = vex::distance(vex::PORT15);
-		vex::distance front_distance_left = vex::distance(vex::PORT16);
-		vex::distance front_distance_right = vex::distance(vex::PORT17);
-		vex::distance back_distance_left = vex::distance(vex::PORT18);
-		vex::distance back_distance_right = vex::distance(vex::PORT19);
+		vex::distance right_distance_forward = vex::distance(vex::PORT6);
+		vex::distance right_distance_aft = vex::distance(vex::PORT7);
+		vex::distance front_distance_left = vex::distance(vex::PORT15);
+		vex::distance front_distance_right = vex::distance(vex::PORT14);
+		vex::distance back_distance_left = vex::distance(vex::PORT17);
+		vex::distance back_distance_right = vex::distance(vex::PORT8);
 	}
 
 	namespace pistons {

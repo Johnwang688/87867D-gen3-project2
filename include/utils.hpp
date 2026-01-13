@@ -75,5 +75,19 @@ namespace math {
     inline double curve(double input){
         return A * std::pow(B, input) + C;
     }
+
+    inline double robot_to_math_angle(double robot_angle_deg) {
+        return 90.0 - robot_angle_deg;
+    }
+    
+    // Get direction vector in world coordinates from robot frame angle
+    // Returns (dx, dy) where dx is world X component, dy is world Y component
+    inline void robot_angle_to_direction(double robot_angle_deg, float& dx, float& dy) {
+        double rad = to_rad(robot_angle_deg);
+        //in robot frame: 0° = +Y; forward = (0, 1)
+        //sin(0°) = 0, cos(0°) = 1, so (sin, cos) gives us forward direction
+        dx = static_cast<float>(std::sin(rad));  // Right component
+        dy = static_cast<float>(std::cos(rad));  // Forward component
+    }
     
 }

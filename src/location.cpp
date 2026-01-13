@@ -9,14 +9,14 @@ struct SensorConfig {
 };
 
 static const SensorConfig sensor_layout[8] = {
-    {static_cast<float>(FRONT_LEFT_OFFSET_X),  static_cast<float>(FRONT_LEFT_OFFSET_Y),   0.0f},  // 0: front_left
-    {static_cast<float>(FRONT_RIGHT_OFFSET_X), static_cast<float>(FRONT_RIGHT_OFFSET_Y),  0.0f},  // 1: front_right
-    {static_cast<float>(BACK_LEFT_OFFSET_X),   static_cast<float>(BACK_LEFT_OFFSET_Y),   180.0f}, // 2: back_left
-    {static_cast<float>(BACK_RIGHT_OFFSET_X),  static_cast<float>(BACK_RIGHT_OFFSET_Y),  180.0f}, // 3: back_right
-    {static_cast<float>(LEFT_FORWARD_OFFSET_X), static_cast<float>(LEFT_FORWARD_OFFSET_Y), 90.0f}, // 4: left_forward
-    {static_cast<float>(LEFT_AFT_OFFSET_X),     static_cast<float>(LEFT_AFT_OFFSET_Y),     90.0f}, // 5: left_aft
-    {static_cast<float>(RIGHT_FORWARD_OFFSET_X), static_cast<float>(RIGHT_FORWARD_OFFSET_Y), -90.0f},// 6: right_forward
-    {static_cast<float>(RIGHT_AFT_OFFSET_X),    static_cast<float>(RIGHT_AFT_OFFSET_Y),    -90.0f} // 7: right_aft
+    {static_cast<float>(FRONT_LEFT_OFFSET_X),  static_cast<float>(FRONT_LEFT_OFFSET_Y),   0.0f},   // 0: front_left - points forward
+    {static_cast<float>(FRONT_RIGHT_OFFSET_X), static_cast<float>(FRONT_RIGHT_OFFSET_Y),  0.0f},   // 1: front_right - points forward
+    {static_cast<float>(BACK_LEFT_OFFSET_X),   static_cast<float>(BACK_LEFT_OFFSET_Y),   180.0f}, // 2: back_left - points backward
+    {static_cast<float>(BACK_RIGHT_OFFSET_X),  static_cast<float>(BACK_RIGHT_OFFSET_Y),  180.0f}, // 3: back_right - points backward
+    {static_cast<float>(LEFT_FORWARD_OFFSET_X), static_cast<float>(LEFT_FORWARD_OFFSET_Y), -90.0f}, // 4: left_forward - points left
+    {static_cast<float>(LEFT_AFT_OFFSET_X),     static_cast<float>(LEFT_AFT_OFFSET_Y),     -90.0f}, // 5: left_aft - points left
+    {static_cast<float>(RIGHT_FORWARD_OFFSET_X), static_cast<float>(RIGHT_FORWARD_OFFSET_Y), 90.0f}, // 6: right_forward - points right
+    {static_cast<float>(RIGHT_AFT_OFFSET_X),    static_cast<float>(RIGHT_AFT_OFFSET_Y),    90.0f}  // 7: right_aft - points right
 };
 
 Location::Location(Drivetrain& drivetrain, 
@@ -48,9 +48,14 @@ Location::Location(Drivetrain& drivetrain,
 }
 
 void Location::reset(std::int16_t x, std::int16_t y, std::int16_t heading) {
+    // Convert heading from user convention (0° = +Y) to code convention (0° = +X)
+    std::int16_t adjusted_heading = heading + 90;
+    if (adjusted_heading > 180) adjusted_heading -= 360;
+    if (adjusted_heading <= -180) adjusted_heading += 360;
+    
     _x = x;
     _y = y;
-    _heading = heading;
+    _heading = adjusted_heading;
     
     // Reset encoder baselines to prevent drift on first update
     _last_left_encoder = _drivetrain.get_left_encoder();
@@ -59,7 +64,7 @@ void Location::reset(std::int16_t x, std::int16_t y, std::int16_t heading) {
     // Initialize best particle to the reset position
     _bestParticle.x = x;
     _bestParticle.y = y;
-    _bestParticle.heading = heading;
+    _bestParticle.heading = adjusted_heading;
 }
 
 std::int16_t Location::get_x() {
@@ -80,6 +85,12 @@ std::int16_t Location::get_heading() {
     _positionMutex.lock();
     std::int16_t heading = _heading;
     _positionMutex.unlock();
+    
+    // Convert from code convention (0° = +X) back to user convention (0° = +Y)
+    heading -= 90;
+    if (heading > 180) heading -= 360;
+    if (heading <= -180) heading += 360;
+    
     return heading;
 }
 
@@ -165,10 +176,43 @@ Particle Location::estimate() {
     delta.y = static_cast<int16_t>(_y + (d_center * sin(avg_heading_rad)));
     delta.heading = static_cast<int16_t>(current_imu_heading);
 
-    return delta; // This is our 'Guess' for the search function
+    return delta; 
 }
 
-float Location::calculate_intersection(float s_x, float s_y, float angle_deg, const Line& wall) {
+float Location::calculate_intersection(float s_x, float s_y, float robot_angle_deg, const Line& wall) {
+    // Convert robot frame angle to direction vector in world coordinates
+    float r_dx, r_dy;
+    math::robot_angle_to_direction(robot_angle_deg, r_dx, r_dy);
+
+    //printf("r_dx: %f r_dy: %f\n", r_dx, r_dy);
+
+    float w_dx = wall.x2 - wall.x1;
+    float w_dy = wall.y2 - wall.y1;
+
+    //printf("w_dx: %f w_dy: %f\n", w_dx, w_dy);
+
+    // Standard line-line intersection formula:
+    // Ray: P = (s_x, s_y) + t * (r_dx, r_dy)
+    // Wall: Q = (wall.x1, wall.y1) + u * (w_dx, w_dy)
+    // At intersection: (s_x, s_y) + t*(r_dx, r_dy) = (wall.x1, wall.y1) + u*(w_dx, w_dy)
+    // Rearranging: (wall.x1 - s_x, wall.y1 - s_y) = t*(r_dx, r_dy) - u*(w_dx, w_dy)
+    // 
+    // Using standard formula: denominator = r_dx * w_dy - r_dy * w_dx
+    float denominator = (r_dx * w_dy) - (r_dy * w_dx);
+
+    if (std::abs(denominator) < 0.0001f) return 2000.0f;
+
+    float t = ((wall.x1 - s_x) * w_dy - (wall.y1 - s_y) * w_dx) / denominator;
+    float u = ((wall.x1 - s_x) * r_dy - (wall.y1 - s_y) * r_dx) / denominator;
+
+    if (t > 0 && u >= 0 && u <= 1) {
+        return t;
+    }
+
+    return 2000.0f;
+}
+
+/*float Location::calculate_intersection(float s_x, float s_y, float angle_deg, const Line& wall) {
     float rad = math::to_rad(angle_deg);
     float r_dx = std::cos(rad);
     float r_dy = std::sin(rad);
@@ -188,7 +232,7 @@ float Location::calculate_intersection(float s_x, float s_y, float angle_deg, co
     }
 
     return 2000.0f;
-}
+}*/
 
 bool Location::is_particle_valid(const Particle& particle) {
     // Check if particle center is within bounds
@@ -203,8 +247,10 @@ bool Location::is_particle_valid(const Particle& particle) {
     float sin_h = std::sin(rad_h);
     
     for (int i = 0; i < 8; ++i) {
-        float s_x = particle.x + (sensor_layout[i].offX * cos_h - sensor_layout[i].offY * sin_h);
-        float s_y = particle.y + (sensor_layout[i].offX * sin_h + sensor_layout[i].offY * cos_h);
+        // Robot frame: offX = right, offY = forward
+        // Field frame: forward = (cos_h, sin_h), right = (sin_h, -cos_h)
+        float s_x = particle.x + (sensor_layout[i].offY * cos_h + sensor_layout[i].offX * sin_h);
+        float s_y = particle.y + (sensor_layout[i].offY * sin_h - sensor_layout[i].offX * cos_h);
         
         if (s_x < -OUT_OF_BOUNDS || s_x > OUT_OF_BOUNDS || 
             s_y < -OUT_OF_BOUNDS || s_y > OUT_OF_BOUNDS) {
@@ -221,13 +267,53 @@ void Location::raycast(Particle& particle) {
         &particle.left_forward, &particle.left_aft, &particle.right_forward, &particle.right_aft
     };
 
+    // particle.heading is in robot frame: 0° = +Y (forward), 90° = +X (right)
     float rad_h = math::to_rad(particle.heading);
     float cos_h = std::cos(rad_h);
     float sin_h = std::sin(rad_h);
 
     for (int i = 0; i < 8; ++i) {
-        float s_x = particle.x + (sensor_layout[i].offX * cos_h - sensor_layout[i].offY * sin_h);
-        float s_y = particle.y + (sensor_layout[i].offX * sin_h + sensor_layout[i].offY * cos_h);
+        // Transform sensor position from robot frame to world frame
+        // Robot frame: offX = right (+X), offY = forward (+Y)
+        // When robot heading is 0° (pointing +Y):
+        //   Forward direction in world: (sin(0°), cos(0°)) = (0, 1) = +Y ✓
+        //   Right direction in world: (cos(0°), -sin(0°)) = (1, 0) = +X ✓
+        // When robot heading is 90° (pointing +X):
+        //   Forward direction: (sin(90°), cos(90°)) = (1, 0) = +X ✓
+        //   Right direction: (cos(90°), -sin(90°)) = (0, -1) = -Y (which is correct for right when facing +X)
+        float s_x = particle.x + (sensor_layout[i].offY * sin_h + sensor_layout[i].offX * cos_h);
+        float s_y = particle.y + (sensor_layout[i].offY * cos_h - sensor_layout[i].offX * sin_h);
+
+        // Sensor angle is relative to robot forward direction (robot frame)
+        // Add robot heading to get absolute angle in robot frame
+        float sensor_angle = particle.heading + sensor_layout[i].relativeAngle;
+
+        float min_dist = 2000.0f;
+        for (int w = 0; w < 4; ++w) {
+            const auto& wall = map[w];
+            float d = calculate_intersection(s_x, s_y, sensor_angle, wall);
+            if (d < min_dist) min_dist = d;
+        }
+
+        *p_readings[i] = static_cast<uint16_t>(min_dist);
+    }
+}
+
+/*void Location::raycast(Particle& particle) {
+    uint16_t* p_readings[8] = {
+        &particle.front_left, &particle.front_right, &particle.back_left, &particle.back_right,
+        &particle.left_forward, &particle.left_aft, &particle.right_forward, &particle.right_aft
+    };
+
+    float rad_h = math::to_rad(particle.heading);
+    float cos_h = std::cos(rad_h);
+    float sin_h = std::sin(rad_h);
+
+    for (int i = 0; i < 8; ++i) {
+        // Robot frame: offX = right, offY = forward
+        // Field frame: forward = (cos_h, sin_h), right = (sin_h, -cos_h)
+        float s_x = particle.x + (sensor_layout[i].offY * cos_h + sensor_layout[i].offX * sin_h);
+        float s_y = particle.y + (sensor_layout[i].offY * sin_h - sensor_layout[i].offX * cos_h);
 
         float world_angle = particle.heading + sensor_layout[i].relativeAngle;
 
@@ -239,7 +325,7 @@ void Location::raycast(Particle& particle) {
 
         *p_readings[i] = static_cast<uint16_t>(min_dist);
     }
-}
+}*/
 
 void Location::update() {
     Particle guess = estimate();
