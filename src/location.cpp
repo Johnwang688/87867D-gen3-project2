@@ -171,10 +171,17 @@ Particle Location::estimate() {
     double avg_heading_deg = helpers::average_heading(_heading, current_imu_heading);
     double avg_heading_rad = math::to_rad(avg_heading_deg);
     
+    // Convert encoder degrees to mm
+    double d_center_mm = d_center * MM_PER_TICK;
+    
     Particle delta;
-    delta.x = static_cast<int16_t>(_x + (d_center * cos(avg_heading_rad)));
-    delta.y = static_cast<int16_t>(_y + (d_center * sin(avg_heading_rad)));
+    delta.x = static_cast<int16_t>(_x + (d_center_mm * cos(avg_heading_rad)));
+    delta.y = static_cast<int16_t>(_y + (d_center_mm * sin(avg_heading_rad)));
     delta.heading = static_cast<int16_t>(current_imu_heading);
+    // Initialize sensor readings to 2000 (out of range) to avoid uninitialized values
+    delta.front_left = delta.front_right = delta.back_left = delta.back_right = 2000;
+    delta.left_forward = delta.left_aft = delta.right_forward = delta.right_aft = 2000;
+    delta.valid = true;
 
     return delta; 
 }
@@ -274,27 +281,28 @@ void Location::raycast(Particle& particle) {
 
     for (int i = 0; i < 8; ++i) {
         // Transform sensor position from robot frame to world frame
-        // Robot frame: offX = right (+X), offY = forward (+Y)
-        // When robot heading is 0° (pointing +Y):
-        //   Forward direction in world: (sin(0°), cos(0°)) = (0, 1) = +Y ✓
-        //   Right direction in world: (cos(0°), -sin(0°)) = (1, 0) = +X ✓
-        // When robot heading is 90° (pointing +X):
-        //   Forward direction: (sin(90°), cos(90°)) = (1, 0) = +X ✓
-        //   Right direction: (cos(90°), -sin(90°)) = (0, -1) = -Y (which is correct for right when facing +X)
-        float s_x = particle.x + (sensor_layout[i].offY * sin_h + sensor_layout[i].offX * cos_h);
-        float s_y = particle.y + (sensor_layout[i].offY * cos_h - sensor_layout[i].offX * sin_h);
+        // Robot frame: offX = right, offY = forward
+        // Code convention: heading 0° = +X, 90° = +Y
+        // Forward direction = (cos_h, sin_h), Right direction = (sin_h, -cos_h)
+        float s_x = particle.x + (sensor_layout[i].offY * cos_h + sensor_layout[i].offX * sin_h);
+        float s_y = particle.y + (sensor_layout[i].offY * sin_h - sensor_layout[i].offX * cos_h);
 
         // Sensor angle is relative to robot forward direction (robot frame)
-        // Add robot heading to get absolute angle in robot frame
-        float sensor_angle = particle.heading + sensor_layout[i].relativeAngle;
+        // particle.heading is in CODE convention (0° = +X), but robot_angle_to_direction
+        // expects USER convention (0° = +Y), so convert: user = code - 90°
+        float user_heading = particle.heading - 90.0f;
+        float sensor_angle = user_heading + sensor_layout[i].relativeAngle;
 
         float min_dist = 2000.0f;
-        for (int w = 0; w < 4; ++w) {
+        for (size_t w = 0; w < sizeof(map) / sizeof(map[0]); ++w) {
             const auto& wall = map[w];
             float d = calculate_intersection(s_x, s_y, sensor_angle, wall);
             if (d < min_dist) min_dist = d;
         }
 
+        // Safety clamp: ensure values never exceed 2000mm
+        if (min_dist > 2000.0f) min_dist = 2000.0f;
+        if (min_dist < 0.0f) min_dist = 2000.0f;
         *p_readings[i] = static_cast<uint16_t>(min_dist);
     }
 }
@@ -328,6 +336,8 @@ void Location::raycast(Particle& particle) {
 }*/
 
 void Location::update() {
+    static int debug_counter = 0;
+    
     Particle guess = estimate();
     Reading readings = capture_readings();
     search(guess, readings);
@@ -338,15 +348,113 @@ void Location::update() {
     _y = _bestParticle.y;
     _heading = _bestParticle.heading;
     _positionMutex.unlock();
+    
+    // Comprehensive debug output every 40 cycles (~2 seconds)
+    if (++debug_counter >= 40) {
+        debug_counter = 0;
+        
+        // Convert heading back to user convention for display
+        int16_t user_heading = _heading - 90;
+        if (user_heading > 180) user_heading -= 360;
+        if (user_heading <= -180) user_heading += 360;
+        
+        // Helper function to calculate filtered/weighted error (matches search() logic)
+        auto get_filtered_error = [](uint16_t sim, uint16_t act) -> uint32_t {
+            // If simulated expects out of range (2000mm), zero weight
+            if (sim >= 2000) return 0;
+            // If actual is out of range but simulated expects wall, low weight penalty
+            if (act >= 2000) return 200;
+            // Calculate error and filter if too high
+            int diff = std::abs(static_cast<int>(sim) - static_cast<int>(act));
+            if (diff > 500) return 0;  // Filtered out - error too high
+            return diff * 3;  // High weight (3x) for valid readings
+        };
+        
+        uint32_t total_filtered_error = 0;
+        uint32_t valid_count = 0;
+        
+        // Calculate filtered errors
+        uint32_t err_fl = get_filtered_error(_bestParticle.front_left, readings.front_left);
+        uint32_t err_fr = get_filtered_error(_bestParticle.front_right, readings.front_right);
+        uint32_t err_bl = get_filtered_error(_bestParticle.back_left, readings.back_left);
+        uint32_t err_br = get_filtered_error(_bestParticle.back_right, readings.back_right);
+        uint32_t err_lf = get_filtered_error(_bestParticle.left_forward, readings.left_forward);
+        uint32_t err_la = get_filtered_error(_bestParticle.left_aft, readings.left_aft);
+        uint32_t err_rf = get_filtered_error(_bestParticle.right_forward, readings.right_forward);
+        uint32_t err_ra = get_filtered_error(_bestParticle.right_aft, readings.right_aft);
+        
+        total_filtered_error = err_fl + err_fr + err_bl + err_br + err_lf + err_la + err_rf + err_ra;
+        if (_bestParticle.front_left < 2000 && readings.front_left < 2000 && abs(static_cast<int>(readings.front_left) - static_cast<int>(_bestParticle.front_left)) <= 500) valid_count++;
+        if (_bestParticle.front_right < 2000 && readings.front_right < 2000 && abs(static_cast<int>(readings.front_right) - static_cast<int>(_bestParticle.front_right)) <= 500) valid_count++;
+        if (_bestParticle.back_left < 2000 && readings.back_left < 2000 && abs(static_cast<int>(readings.back_left) - static_cast<int>(_bestParticle.back_left)) <= 500) valid_count++;
+        if (_bestParticle.back_right < 2000 && readings.back_right < 2000 && abs(static_cast<int>(readings.back_right) - static_cast<int>(_bestParticle.back_right)) <= 500) valid_count++;
+        if (_bestParticle.left_forward < 2000 && readings.left_forward < 2000 && abs(static_cast<int>(readings.left_forward) - static_cast<int>(_bestParticle.left_forward)) <= 500) valid_count++;
+        if (_bestParticle.left_aft < 2000 && readings.left_aft < 2000 && abs(static_cast<int>(readings.left_aft) - static_cast<int>(_bestParticle.left_aft)) <= 500) valid_count++;
+        if (_bestParticle.right_forward < 2000 && readings.right_forward < 2000 && abs(static_cast<int>(readings.right_forward) - static_cast<int>(_bestParticle.right_forward)) <= 500) valid_count++;
+        if (_bestParticle.right_aft < 2000 && readings.right_aft < 2000 && abs(static_cast<int>(readings.right_aft) - static_cast<int>(_bestParticle.right_aft)) <= 500) valid_count++;
+        
+        printf("\n=== MCL DEBUG (every 2s) ===\n");
+        printf("Position: (%d, %d) Heading: %d° (user conv)\n", _x, _y, user_heading);
+        printf("Filtered Error: %u | Valid Sensors: %u/8\n", total_filtered_error, valid_count);
+        printf("Sensor      | Actual | Expected | Weighted Error | Status\n");
+        printf("------------|--------|----------|----------------|--------\n");
+        
+        auto print_sensor = [&](const char* name, uint16_t act, uint16_t exp, uint32_t err) {
+            const char* status = "FILTERED";
+            if (exp >= 2000) status = "IGNORED (exp OOR)";
+            else if (act >= 2000) status = "LOW WT";
+            else if (std::abs(static_cast<int>(act) - static_cast<int>(exp)) > 500) status = "FILTERED (>500)";
+            else status = "ACTIVE";
+            printf("%-11s | %4d   | %4d     | %10u     | %s\n", name, act, exp, err, status);
+        };
+        
+        print_sensor("FrontLeft", readings.front_left, _bestParticle.front_left, err_fl);
+        print_sensor("FrontRight", readings.front_right, _bestParticle.front_right, err_fr);
+        print_sensor("BackLeft", readings.back_left, _bestParticle.back_left, err_bl);
+        print_sensor("BackRight", readings.back_right, _bestParticle.back_right, err_br);
+        print_sensor("LeftFwd", readings.left_forward, _bestParticle.left_forward, err_lf);
+        print_sensor("LeftAft", readings.left_aft, _bestParticle.left_aft, err_la);
+        print_sensor("RightFwd", readings.right_forward, _bestParticle.right_forward, err_rf);
+        print_sensor("RightAft", readings.right_aft, _bestParticle.right_aft, err_ra);
+        printf("============================\n\n");
+    }
 }
 
 void Location::search(Particle guess, Reading readings) {
+    // Raycast the initial guess to get proper sensor readings
     Particle bestInLayer = guess;
     bestInLayer.valid = true;
+    if (is_particle_valid(bestInLayer)) {
+        raycast(bestInLayer);
+    }
+    uint32_t finalError = 0;
 
     for (int layer = 0; layer < LAYERS; ++layer) {  
         int16_t step = INITIAL_STEP_SIZE >> layer; 
         _particles.clear();
+
+        // Add park zone particles in first layer (encoder guess is inaccurate in park zones)
+        if (layer == 0) {
+            Particle parkRed = bestInLayer;
+            parkRed.x = RED_PARK_ZONE_X;
+            parkRed.y = RED_PARK_ZONE_Y;
+            parkRed.heading = bestInLayer.heading;  // Use same heading as guess
+            if (is_particle_valid(parkRed)) {
+                parkRed.valid = true;
+                raycast(parkRed);
+                _particles.push_back(parkRed);
+            }
+            
+            Particle parkBlue = bestInLayer;
+            parkBlue.x = BLUE_PARK_ZONE_X;
+            parkBlue.y = BLUE_PARK_ZONE_Y;
+            parkBlue.heading = bestInLayer.heading;  // Use same heading as guess
+            if (is_particle_valid(parkBlue)) {
+                parkBlue.valid = true;
+                raycast(parkBlue);
+                _particles.push_back(parkBlue);
+            }
+        }
 
         for (int dx = -1; dx <= 1; ++dx) {
             for (int dy = -1; dy <= 1; ++dy) {
@@ -370,26 +478,67 @@ void Location::search(Particle guess, Reading readings) {
             if (!p.valid) continue;
             
             uint32_t currentError = 0;
+            uint32_t validSensorCount = 0;
 
-            auto get_err = [](uint16_t sim, uint16_t act) -> uint16_t {
-                if (act >= 2000 && sim >= 2000) return 0;
-                return std::abs(static_cast<int>(sim) - static_cast<int>(act));
+            // Weighted error function: filters bad readings and weights sensors by importance
+            auto get_weighted_err = [&](uint16_t sim, uint16_t act, bool is_small_object) -> uint32_t {
+                // Filter 1: Skip small objects (game elements/blocks)
+                if (is_small_object) {
+                    return 0;  // Don't count this sensor at all
+                }
+                
+                // Filter 2: If simulated expects out of range (2000mm), give zero weight
+                // These sensors don't matter for localization (weight 0)
+                if (sim >= 2000) {
+                    return 0;  // Zero weight - sensor doesn't expect to see a wall
+                }
+                
+                // Filter 3: If actual is out of range but simulated expects a wall
+                // This is a mismatch, but give low weight (we expected wall, don't see it)
+                if (act >= 2000) {
+                    return 200;  // Low weight penalty (fixed 200mm error)
+                }
+                
+                // Both in range: calculate error and filter if too high
+                int diff = std::abs(static_cast<int>(sim) - static_cast<int>(act));
+                
+                // Filter 4: Throw out readings with >500mm error (likely wrong)
+                if (diff > 500) {
+                    return 0;  // Don't count this sensor - error too high
+                }
+                
+                // Valid reading: return error with high weight (weight 3)
+                // High weight because this sensor is actually detecting a wall
+                validSensorCount++;
+                return diff * 3;  // High weight (3x) for sensors detecting walls
             };
 
-            currentError += get_err(p.front_left,    readings.front_left);
-            currentError += get_err(p.front_right,   readings.front_right);
-            currentError += get_err(p.back_left,     readings.back_left);
-            currentError += get_err(p.back_right,    readings.back_right);
-            currentError += get_err(p.left_forward,  readings.left_forward);
-            currentError += get_err(p.left_aft,      readings.left_aft);
-            currentError += get_err(p.right_forward, readings.right_forward);
-            currentError += get_err(p.right_aft,     readings.right_aft);
+            // Check each sensor (object size detection would go here, but we don't have it yet)
+            // For now, assume all readings are valid (not small objects)
+            // TODO: Add object size filtering when available (use sensor.objectSize() method)
+            bool is_small_object[8] = {false, false, false, false, false, false, false, false};
+            
+            currentError += get_weighted_err(p.front_left,    readings.front_left,    is_small_object[0]);
+            currentError += get_weighted_err(p.front_right,   readings.front_right,   is_small_object[1]);
+            currentError += get_weighted_err(p.back_left,     readings.back_left,     is_small_object[2]);
+            currentError += get_weighted_err(p.back_right,    readings.back_right,    is_small_object[3]);
+            currentError += get_weighted_err(p.left_forward,  readings.left_forward,  is_small_object[4]);
+            currentError += get_weighted_err(p.left_aft,      readings.left_aft,      is_small_object[5]);
+            currentError += get_weighted_err(p.right_forward, readings.right_forward, is_small_object[6]);
+            currentError += get_weighted_err(p.right_aft,     readings.right_aft,     is_small_object[7]);
+            
+            // Filter 5: Require at least 4 good sensor readings (sensors detecting walls)
+            if (validSensorCount < 4) {
+                currentError = 0xFFFFFFFF;  // Mark as invalid - not enough good readings
+            }
 
             if (currentError < minError) {
                 minError = currentError;
                 bestInLayer = p;
             }
         }
+        finalError = minError;
     }
+    
     _bestParticle = bestInLayer;
 }

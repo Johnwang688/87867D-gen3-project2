@@ -44,8 +44,14 @@ constexpr double C = -A;
 
 // Particle filter constants
 constexpr std::uint8_t LAYERS = 6;
-constexpr std::uint16_t INITIAL_STEP_SIZE = 800;
+constexpr std::uint16_t INITIAL_STEP_SIZE = 600;  // Reduced from 800 to reduce drift
 constexpr std::uint16_t MAX_PARTICLES = 22 * (LAYERS-1);
+
+// park zone particles
+constexpr std::int16_t RED_PARK_ZONE_X = -1500;
+constexpr std::int16_t RED_PARK_ZONE_Y = 0;
+constexpr std::int16_t BLUE_PARK_ZONE_X = 1500;
+constexpr std::int16_t BLUE_PARK_ZONE_Y = 0;
 
 // Robot dimensions and offsets (in mm)
 constexpr std::int16_t LEFT_FORWARD_OFFSET_X = -135;
@@ -79,15 +85,15 @@ constexpr Line map[] = {
     {-WIDTH/2, -HEIGHT/2,  WIDTH/2, -HEIGHT/2}, { WIDTH/2, -HEIGHT/2,  WIDTH/2,  HEIGHT/2},
     { WIDTH/2,  HEIGHT/2, -WIDTH/2,  HEIGHT/2}, {-WIDTH/2,  HEIGHT/2, -WIDTH/2, -HEIGHT/2},
 
-    // 2. West Long Goal "V" Legs
-    //{-1500, -300, -HEIGHT/2,    0}, // Leg 1
-    //{-1500,  300, -HEIGHT/2,    0}, // Leg 2
+    // 2. center goal
+    {-70, 0, 0, 70}, {0, -70, 70, 0}, {-120, 120, 120, -120},
 
-    // 3. East Long Goal "V" Legs
-    //{ 1500, -300,  HEIGHT/2,    0}, // Leg 1
-    //{ 1500,  300,  HEIGHT/2,    0}, // Leg 2
+    // bottom long goal
+    {-510, -1200,-600,-1130}, {-510, -1200,-600,-1270},
+    {600,-1130,510,-1200}, {600,-1270,510,-1200},
 
-    // 4. Center Goal Vertical Supports (Parallel Lines)
-    //{-150,  300,  150,  300}, // Center Goal North Support
-    //{-150, -300,  150, -300}  // Center Goal South Support
+    //top long goal
+    {600,1130,510,1200}, {600,1270,510,1200},
+    {-510,1200,-600,1130}, {-510,1200,-600,1270},
+
 };
