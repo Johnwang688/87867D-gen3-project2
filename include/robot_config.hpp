@@ -61,7 +61,7 @@ namespace bot {
                     if (avg_heading > 180.0) avg_heading -= 360.0;
                     if (avg_heading <= -180.0) avg_heading += 360.0;
                     
-                    return avg_heading;
+                    return -avg_heading;
                 }
 
             private:

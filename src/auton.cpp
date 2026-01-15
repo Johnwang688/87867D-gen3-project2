@@ -42,7 +42,28 @@ namespace bot {
         }
 
         void test(){
-
+            std::vector<Waypoint> path1 = {
+                {-450, 600, IntakeMode::INTAKE},
+                {-600, 600, IntakeMode::INTAKE},
+                {-1100, 400, IntakeMode::INTAKE},
+                //{-700, 500, IntakeMode::INTAKE},
+                //{-1200, 1200, IntakeMode::INTAKE},
+                /*
+                {1000, 0, IntakeMode::INTAKE},
+                {1000, 1000, IntakeMode::INTAKE},
+                {0, 1000, IntakeMode::INTAKE},
+                {0, 0, IntakeMode::INTAKE}*/
+            };
+            task::sleep(2000);
+            /*dt.turn_to_heading(90, 3000, 40);
+            return;
+            dt.drive_to(-450, 600, 1200, 40);
+            dt.drive_to(-1000, 200, 1500, 40);
+            return;
+            */
+            dt.follow_path(path1, bot::mcl::location, 1000, 100, 150);
+            dt.brake();
+            dt.stop();
         }
     }
 }

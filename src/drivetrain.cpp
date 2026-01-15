@@ -1,4 +1,5 @@
 #include "drivetrain.hpp"
+#include "auton.hpp"
 
 Drivetrain::Drivetrain(vex::motor_group& left_motor, vex::motor_group& right_motor,
     bot::sensors::inertial_group& imu) : 
@@ -265,15 +266,25 @@ void Drivetrain::handle_intake_mode(IntakeMode mode) {
 
 }
 
+void Drivetrain::stop() {
+    _left_motor.stop();
+    _right_motor.stop();
+}
+
+void Drivetrain::brake() {
+    _left_motor.setStopping(vex::brakeType::brake);
+    _right_motor.setStopping(vex::brakeType::brake);
+}
+
 void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
     double lookahead, double maxSpeed, double stopDist) {
     
     // Tuning parameters
-    const double kHeading = 2.0;           // Heading correction gain
-    const double kSlow = 0.5;              // Slowdown factor near end
-    const double minSpeed = 0.15 * maxSpeed;
-    const double maxCurvSpeedFactor = 0.6; // Slow down on sharp turns
-    const double dt = 0.05;                // Loop timestep (50ms)
+    const double kHeading = K_HEADING;           // Heading correction gain
+    const double kSlow = K_SLOW;              // Slowdown factor near end
+    const double minSpeed = MIN_SPEED_PCT * maxSpeed;
+    const double maxCurvSpeedFactor = MAX_CURV_SPEED_FACTOR; // Slow down on sharp turns
+    const double dt = PP_DT;                // Loop timestep
     
     if (path.size() < 2) {
         _left_motor.stop();
@@ -298,11 +309,16 @@ void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
         Waypoint& goal = path[lastIndex];
         double distToGoal = std::hypot(goal.x - rx, goal.y - ry);
         
+        // DEBUG: Print position and distance every loop
+        printf("Pos: (%.0f, %.0f) Goal: (%.0f, %.0f) Dist: %.0f Stop: %.0f\n", 
+               rx, ry, goal.x, goal.y, distToGoal, stopDist);
+        
         if (distToGoal < stopDist) {
             _left_motor.stop();
             _right_motor.stop();
             // Handle final waypoint intake mode
             handle_intake_mode(goal.intake_mode);
+            printf("Path complete! Final dist: %.0f\n", distToGoal);
             break;
         }
         
@@ -397,6 +413,15 @@ void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
         
         vex::task::sleep(static_cast<int>(dt * 1000));
     }
+}
+
+void Drivetrain::drive_to(double x, double y, double timeout, double speed_limit) {
+    // Get current position from global MCL location
+    double rx = bot::mcl::location.get_x();
+    double ry = bot::mcl::location.get_y();
+    double dist = std::hypot(x - rx, y - ry);
+    double angle = std::atan2(y - ry, x - rx);
+    drive_arc(dist, -angle * 180.0 / M_PI, timeout, speed_limit);
 }
 
 double Drivetrain::get_left_encoder() {

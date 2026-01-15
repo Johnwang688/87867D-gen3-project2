@@ -1,3 +1,39 @@
+# Build output
 /bin
 /build
+*.o
+*.obj
+*.elf
+*.bin
+*.map
+
+# Compilation database
 compile_commands.json
+
+# Backtest (local testing only)
+backtest.cpp
+backtest.exe
+*.exe
+
+# IDE and editor files
+.vscode/*
+!.vscode/vex_project_settings.json
+!.vscode/c_cpp_properties.json
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

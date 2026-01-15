@@ -18,6 +18,7 @@ class Drivetrain {
         
         void drive_for(double distance, double timeout, double speed_limit);
         void turn_to_heading(double heading, double timeout, double speed_limit);
+        void drive_to(double x, double y, double timeout, double speed_limit);
         void tank_drive(double left_speed, double right_speed);
         void arcade_drive(double fwd, double turn);
         void match_load(std::int8_t times);
@@ -27,6 +28,8 @@ class Drivetrain {
 
         double get_left_encoder();
         double get_right_encoder();
+        void stop();
+        void brake();
 
     private:
         motor_group& _left_motor;

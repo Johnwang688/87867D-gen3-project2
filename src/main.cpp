@@ -30,6 +30,12 @@ using namespace bot;
 
 void pre_auton(void) {
     bot::sensors::imu.calibrate();
+    bot::mcl::location.reset(0, 1500, 
+      static_cast<std::int16_t>(std::round(bot::sensors::imu.get_heading())) + 90);
+    bot::mcl::location.start();
+    task::sleep(1000);
+    printf("IMU: %.2f\n", bot::sensors::imu.get_heading());
+    printf("Location: %d, %d, %d\n", bot::mcl::location.get_x(), bot::mcl::location.get_y(), bot::mcl::location.get_heading());
     return;
   // All activities that occur before the competition starts
   // Example: clearing encoders, setting servo positions, ...
@@ -49,6 +55,7 @@ void autonomous(void) {
   // ..........................................................................
   // Insert autonomous user code here.
   // ..........................................................................
+  bot::auton::test();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -63,14 +70,14 @@ void autonomous(void) {
 
 void usercontrol(void) {
 
-  bot::sensors::imu.calibrate();
-  vex::task::sleep(500);
+  //bot::sensors::imu.calibrate();
+  //vex::task::sleep(500);
   
   // Debug: Print IMU heading after calibration
-  printf("IMU heading after calibration: %.2f\n", bot::sensors::imu.get_heading());
+  //printf("IMU heading after calibration: %.2f\n", bot::sensors::imu.get_heading());
   
-  bot::mcl::location.reset(300, -1200, 0);
-  bot::mcl::location.start();
+  //bot::mcl::location.reset(300, -1200, 0);
+  //bot::mcl::location.start();
 
   //bot::pistons::toggle_arm_piston();
 
