@@ -19,10 +19,10 @@ constexpr double MAX_OUTPUT = 100.0;
 constexpr double DT = 0.02; // seconds 
 
 // pure pursuit constants
-constexpr double K_HEADING = 0.04;
+constexpr double K_HEADING = 0.045;
 constexpr double K_SLOW = 5.0;
-constexpr double MIN_SPEED_PCT = 0.15;
-constexpr double MAX_CURV_SPEED_FACTOR = 0.65;
+constexpr double MIN_SPEED_PCT = 0.20;
+constexpr double MAX_CURV_SPEED_FACTOR = 0.55;
 constexpr double PP_DT = 0.05;
 
 //mm

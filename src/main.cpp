@@ -33,7 +33,6 @@ void pre_auton(void) {
     bot::mcl::location.reset(0, 1500, 
       static_cast<std::int16_t>(std::round(bot::sensors::imu.get_heading())) + 90);
     bot::mcl::location.start();
-    task::sleep(1000);
     printf("IMU: %.2f\n", bot::sensors::imu.get_heading());
     printf("Location: %d, %d, %d\n", bot::mcl::location.get_x(), bot::mcl::location.get_y(), bot::mcl::location.get_heading());
     return;

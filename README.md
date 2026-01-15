@@ -1,16 +1,16 @@
-# VEX V5 robot program for team 87867D, BOT4, version 2 
+# VEX V5 robot program for Ruiguan push back robot. 
 
 A VEX V5 competition robot control system featuring tank drive, PID-based autonomous navigation, Pure Pursuit path following, and Monte Carlo Localization using distance sensors.
 
 ## Features
 
-- **Tank Drive Control** - Dual joystick control with exponential curve for fine control
+- **Tank Drive Control** - Exponential curve for sens adjustments. curve found in utils.hpp (math::curve()). comment out the curve in main -> opcontrol() for linear scaling (does not affect functionality). 
 - **PID Controllers** - Smooth, accurate movements for autonomous routines
-- **Pure Pursuit Path Following** - Curved path navigation with dynamic speed control
+- **Pure Pursuit Path Following** - Curved path navigation with speed control
 - **Monte Carlo Localization (MCL)** - Real-time position estimation using 8 distance sensors
-- **Dual IMU Fusion** - Averaged heading from two inertial sensors for improved accuracy
-- **Motor Temperature Monitoring** - On-demand temperature display on controller screen
-- **Modular Architecture** - Clean separation between hardware config, control logic, and autonomous routines
+- **Double Inertial sensor** - Averaged heading from two inertial sensors for improved accuracy
+- **Motor Temperature Monitoring** - Press X to display motor temps on controller screen.
+- **Architecture** - all bot members under namespace bot. motors and motor groups under namespace bot::motors. all sensors under bot::sensors. pistons and piston methods under bot::pistons.
 
 ## Hardware Configuration
 
@@ -44,8 +44,8 @@ A VEX V5 competition robot control system featuring tank drive, PID-based autono
 PROJECT2/
 ├── include/
 │   ├── bot.hpp           # Master include (aggregates all headers)
-│   ├── robot_config.hpp  # Hardware declarations & IMU fusion class
-│   ├── constants.hpp     # Tuning constants, field map, PID gains
+│   ├── robot_config.hpp  # Hardware declarations & imu_group
+│   ├── constants.hpp     # Tuning constants, field map, PID gains, setup constants
 │   ├── types.hpp         # Data structures (Particle, Waypoint, etc.)
 │   ├── utils.hpp         # Math helpers (clamp, wrap, curve, etc.)
 │   ├── pid.hpp           # PID controller class
@@ -60,7 +60,7 @@ PROJECT2/
 │   ├── drivetrain.cpp    # Drive control & Pure Pursuit
 │   ├── location.cpp      # MCL particle filter
 │   ├── buttons.cpp       # Button handler implementations
-│   └── auton.cpp         # Autonomous routines
+│   └── auton.cpp         # Autonomous routes
 ├── vex/                  # VEX build system files
 └── makefile
 ```
