@@ -6,7 +6,11 @@ constexpr double DRIVE_KP = 0.10;
 constexpr double DRIVE_KI = 0.01;
 constexpr double DRIVE_KD = 0.001;
 
-constexpr double TURN_KP = 0.20;
+//constexpr double TURN_KP = 0.4;
+//constexpr double TURN_KI = 0.01;
+//constexpr double TURN_KD = 0.001;
+
+constexpr double TURN_KP = 0.4;
 constexpr double TURN_KI = 0.01;
 constexpr double TURN_KD = 0.001;
 
@@ -19,10 +23,10 @@ constexpr double MAX_OUTPUT = 100.0;
 constexpr double DT = 0.02; // seconds 
 
 // pure pursuit constants
-constexpr double K_HEADING = 0.045;
-constexpr double K_SLOW = 5.0;
-constexpr double MIN_SPEED_PCT = 0.20;
-constexpr double MAX_CURV_SPEED_FACTOR = 0.55;
+constexpr double K_HEADING = 0.02;
+constexpr double K_SLOW = 0.40;
+constexpr double MIN_SPEED_PCT = 0.1;
+constexpr double MAX_CURV_SPEED_FACTOR = 0.7;
 constexpr double PP_DT = 0.05;
 
 //mm
@@ -39,7 +43,7 @@ constexpr double MAX_VOLTAGE = 11.0;
 
 // controller deadzone 
 constexpr double CONTROLLER_DEADZONE = 1.0;
-constexpr double MID_SPEED = 100.0;
+constexpr double MID_SPEED = 80.0;
 
 // max accel gain for PID controllers 
 constexpr double MAX_ACCEL = 3.5;

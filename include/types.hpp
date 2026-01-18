@@ -19,6 +19,10 @@ struct Reading {
     left_forward, left_aft, right_forward, right_aft;
 };
 
+struct Pose {
+    double x, y, heading;
+};
+
 enum class IntakeMode : std::int8_t {
     STOP = 0,
     INTAKE = 1,

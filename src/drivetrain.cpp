@@ -15,7 +15,11 @@ Drivetrain::Drivetrain(vex::motor_group& left_motor, vex::motor_group& right_mot
     _left_turn_pid(TURN_KP, TURN_KI, TURN_KD),
     _right_turn_pid(TURN_KP, TURN_KI, TURN_KD),
     _left_arc_pid(ARC_KP, ARC_KI, ARC_KD),
-    _right_arc_pid(ARC_KP, ARC_KI, ARC_KD)
+    _right_arc_pid(ARC_KP, ARC_KI, ARC_KD),
+    _pp_k_heading(K_HEADING),
+    _pp_k_slow(K_SLOW),
+    _pp_max_curv_speed_factor(MAX_CURV_SPEED_FACTOR),
+    _pp_min_speed_pct(MIN_SPEED_PCT)
 {}
 
 void Drivetrain::drive_for(double distance, double timeout, double speed_limit) {
@@ -34,17 +38,19 @@ void Drivetrain::drive_for(double distance, double timeout, double speed_limit) 
     
     double lastLeftOutput = 0.0;
     double lastRightOutput = 0.0;
+
+    double leftCurrentPos, rightCurrentPos, leftError, rightError, leftOutput, rightOutput;
     
     double start_time = bot::Brain.Timer.time(vex::msec);
     while (bot::Brain.Timer.time(vex::msec) - start_time < timeout) {
-        double leftCurrentPos = _left_motor.position(degrees);
-        double rightCurrentPos = _right_motor.position(degrees);
+        leftCurrentPos = _left_motor.position(degrees);
+        rightCurrentPos = _right_motor.position(degrees);
         
-        double leftError = leftTargetPos - leftCurrentPos;
-        double rightError = rightTargetPos - rightCurrentPos;
+        leftError = leftTargetPos - leftCurrentPos;
+        rightError = rightTargetPos - rightCurrentPos;
         
-        double leftOutput = _left_drive_pid.compute(leftTargetPos, leftCurrentPos, 0.02);
-        double rightOutput = _right_drive_pid.compute(rightTargetPos, rightCurrentPos, 0.02);
+        leftOutput = _left_drive_pid.compute(leftTargetPos, leftCurrentPos, 0.02);
+        rightOutput = _right_drive_pid.compute(rightTargetPos, rightCurrentPos, 0.02);
         
         // Clamp to speed limit
         if (leftOutput > speed_limit) leftOutput = speed_limit;
@@ -86,7 +92,7 @@ void Drivetrain::turn_to_heading(double heading, double timeout, double speed_li
     if (targetHeading <= -180.0) targetHeading += 360.0;
 
     _left_turn_pid.reset();
-    double lastOutput = 0.0;
+    //double lastOutput = 0.0;
     double start_time = bot::Brain.Timer.time(vex::msec);
 
     while (bot::Brain.Timer.time(vex::msec) - start_time < timeout) {
@@ -100,9 +106,9 @@ void Drivetrain::turn_to_heading(double heading, double timeout, double speed_li
         output = math::clamp(output, -speed_limit, speed_limit);
         
         //cap how fast output can change (prevents tipping)
-        if (output - lastOutput > _max_accel) output = lastOutput + _max_accel;
-        if (output - lastOutput < -_max_accel) output = lastOutput - _max_accel;
-        lastOutput = output;
+        //if (output - lastOutput > _max_accel) output = lastOutput + _max_accel;
+        //if (output - lastOutput < -_max_accel) output = lastOutput - _max_accel;
+        //lastOutput = output;
 
         _left_motor.spin(forward, output, percent);
         _right_motor.spin(reverse, output, percent);
@@ -276,14 +282,19 @@ void Drivetrain::brake() {
     _right_motor.setStopping(vex::brakeType::brake);
 }
 
+void Drivetrain::coast() {
+    _left_motor.setStopping(vex::brakeType::coast);
+    _right_motor.setStopping(vex::brakeType::coast);
+}
+
 void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
-    double lookahead, double maxSpeed, double stopDist) {
+    double lookahead, double maxSpeed, double stopDist, double timeout) {
     
-    // Tuning parameters
-    const double kHeading = K_HEADING;           // Heading correction gain
-    const double kSlow = K_SLOW;              // Slowdown factor near end
-    const double minSpeed = MIN_SPEED_PCT * maxSpeed;
-    const double maxCurvSpeedFactor = MAX_CURV_SPEED_FACTOR; // Slow down on sharp turns
+    // Tuning parameters (use member variables)
+    const double kHeading = _pp_k_heading;
+    const double kSlow = _pp_k_slow;
+    const double minSpeed = _pp_min_speed_pct * maxSpeed;
+    const double maxCurvSpeedFactor = _pp_max_curv_speed_factor;
     const double dt = PP_DT;                // Loop timestep
     
     if (path.size() < 2) {
@@ -299,7 +310,15 @@ void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
     // Handle first waypoint's intake mode
     handle_intake_mode(path[0].intake_mode);
     
+    double start_time = bot::Brain.Timer.time(vex::msec);
+    
     while (true) {
+        // Check timeout condition (0 = no timeout)
+        if (timeout > 0 && (bot::Brain.Timer.time(vex::msec) - start_time) >= timeout) {
+            _left_motor.stop();
+            _right_motor.stop();
+            return;
+        }
         // 1) Get current pose from odometry
         double rx = location.get_x();
         double ry = location.get_y();
@@ -309,16 +328,11 @@ void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
         Waypoint& goal = path[lastIndex];
         double distToGoal = std::hypot(goal.x - rx, goal.y - ry);
         
-        // DEBUG: Print position and distance every loop
-        printf("Pos: (%.0f, %.0f) Goal: (%.0f, %.0f) Dist: %.0f Stop: %.0f\n", 
-               rx, ry, goal.x, goal.y, distToGoal, stopDist);
-        
         if (distToGoal < stopDist) {
             _left_motor.stop();
             _right_motor.stop();
             // Handle final waypoint intake mode
             handle_intake_mode(goal.intake_mode);
-            printf("Path complete! Final dist: %.0f\n", distToGoal);
             break;
         }
         
@@ -383,7 +397,7 @@ void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
         
         // 5) Compute curvature (Pure Pursuit)
         double L = std::max(lookahead, 1e-6);
-        double curvature = (2.0 * localY) / (L * L);
+        double curvature = -(2.0 * localY) / (L * L);
         
         // 6) Choose linear speed
         double endFactor = std::min(std::max(distToGoal / (lookahead * 2.0), 0.0), 1.0);
@@ -415,13 +429,332 @@ void Drivetrain::follow_path(std::vector<Waypoint>& path, Location& location,
     }
 }
 
+void Drivetrain::follow_path_reverse(std::vector<Waypoint>& path, Location& location,
+    double lookahead, double maxSpeed, double stopDist, double timeout) {
+    
+    // Tuning parameters (use member variables)
+    const double kHeading = _pp_k_heading;
+    const double kSlow = _pp_k_slow;
+    const double minSpeed = _pp_min_speed_pct * maxSpeed;
+    const double maxCurvSpeedFactor = _pp_max_curv_speed_factor;
+    const double dt = PP_DT;                // Loop timestep
+    
+    if (path.size() < 2) {
+        _left_motor.stop();
+        _right_motor.stop();
+        return;
+    }
+    
+    std::size_t lastIndex = path.size() - 1;
+    std::size_t closestSegIndex = 0;
+    std::size_t lastIntakeIndex = 0;
+    
+    // Handle first waypoint's intake mode
+    handle_intake_mode(path[0].intake_mode);
+    
+    double start_time = bot::Brain.Timer.time(vex::msec);
+    
+    while (true) {
+        // Check timeout condition (0 = no timeout)
+        if (timeout > 0 && (bot::Brain.Timer.time(vex::msec) - start_time) >= timeout) {
+            _left_motor.stop();
+            _right_motor.stop();
+            return;
+        }
+        // 1) Get current pose from odometry
+        double rx = location.get_x();
+        double ry = location.get_y();
+        double rtheta = _imu.get_heading() * M_PI / 180.0; // Convert to radians
+        
+        // 2) Exit condition: close enough to goal
+        Waypoint& goal = path[lastIndex];
+        double distToGoal = std::hypot(goal.x - rx, goal.y - ry);
+        
+        if (distToGoal < stopDist) {
+            _left_motor.stop();
+            _right_motor.stop();
+            // Handle final waypoint intake mode
+            handle_intake_mode(goal.intake_mode);
+            break;
+        }
+        
+        // 3) Find lookahead point on the path
+        bool lookPtFound = false;
+        double lookX = goal.x;
+        double lookY = goal.y;
+        
+        // (A) Update closest segment index
+        double bestDist = 1e9;
+        for (std::size_t i = 0; i < path.size() - 1; i++) {
+            double d = helpers::distancePointToSegment(rx, ry, 
+                path[i].x, path[i].y, path[i+1].x, path[i+1].y);
+            if (d < bestDist) {
+                bestDist = d;
+                closestSegIndex = i;
+            }
+        }
+        
+        // Handle intake mode for waypoints we've passed
+        for (std::size_t i = lastIntakeIndex + 1; i <= closestSegIndex + 1 && i < path.size(); i++) {
+            handle_intake_mode(path[i].intake_mode);
+            lastIntakeIndex = i;
+        }
+        
+        // (B) Find first intersection of circle with path segments
+        for (std::size_t i = closestSegIndex; i < path.size() - 1; i++) {
+            auto pts = circleSegmentIntersections(
+                rx, ry, lookahead,
+                path[i].x, path[i].y, path[i+1].x, path[i+1].y
+            );
+            
+            if (!pts.empty()) {
+                // Choose intersection farthest along segment
+                IntersectionPoint best = pts[0];
+                for (const auto& p : pts) {
+                    if (p.t > best.t) best = p;
+                }
+                lookX = best.x;
+                lookY = best.y;
+                lookPtFound = true;
+                break;
+            }
+        }
+        
+        // Fallback if no intersection found
+        if (!lookPtFound) {
+            for (std::size_t i = closestSegIndex; i <= lastIndex; i++) {
+                if (std::hypot(path[i].x - rx, path[i].y - ry) >= lookahead) {
+                    lookX = path[i].x;
+                    lookY = path[i].y;
+                    break;
+                }
+            }
+        }
+        
+        // 4) Transform lookahead point into robot frame (same as forward)
+        double dx = lookX - rx;
+        double dy = lookY - ry;
+        double localX =  std::cos(rtheta) * dx + std::sin(rtheta) * dy;
+        double localY = -std::sin(rtheta) * dx + std::cos(rtheta) * dy;
+        
+        // 5) Compute curvature (Pure Pursuit) - same as forward, v is negative
+        double L = std::max(lookahead, 1e-6);
+        double curvature = (2.0 * localY) / (L * L);
+        
+        // 6) Choose linear speed (negative for reverse)
+        double endFactor = std::min(std::max(distToGoal / (lookahead * 2.0), 0.0), 1.0);
+        double turnFactor = std::min(std::max(1.0 - std::abs(curvature) * _track_width, maxCurvSpeedFactor), 1.0);
+        double v = -maxSpeed * (kSlow + (1.0 - kSlow) * endFactor) * turnFactor;
+        v = std::max(std::min(v, -minSpeed), -maxSpeed);
+        
+        // Heading correction - compute for back to point at target
+        // When reversing, steering is inverted, so negate the heading correction
+        double targetHeading = std::atan2(lookY - ry, lookX - rx);
+        double backTheta = rtheta + M_PI;
+        double headingErr = helpers::wrapToPi(targetHeading - backTheta);
+        double omegaHeading = -kHeading * headingErr;
+        
+        // Combined angular velocity
+        double omega = v * curvature + omegaHeading;
+        
+        // 7) Convert to wheel speeds
+        double vLeft  = v - omega * (_track_width * 0.5);
+        double vRight = v + omega * (_track_width * 0.5);
+        
+        // 8) Clamp to motor range
+        vLeft  = std::min(std::max(vLeft,  -maxSpeed), maxSpeed);
+        vRight = std::min(std::max(vRight, -maxSpeed), maxSpeed);
+        
+        // 9) Send to drivetrain
+        _left_motor.spin(forward, vLeft, percent);
+        _right_motor.spin(forward, vRight, percent);
+        
+        vex::task::sleep(static_cast<int>(dt * 1000));
+    }
+}
+/*
 void Drivetrain::drive_to(double x, double y, double timeout, double speed_limit) {
     // Get current position from global MCL location
-    double rx = bot::mcl::location.get_x();
-    double ry = bot::mcl::location.get_y();
-    double dist = std::hypot(x - rx, y - ry);
-    double angle = std::atan2(y - ry, x - rx);
-    drive_arc(dist, -angle * 180.0 / M_PI, timeout, speed_limit);
+    double startX = static_cast<double>(bot::mcl::location.get_x());
+    double startY = static_cast<double>(bot::mcl::location.get_y());
+    double endX = static_cast<double>(x);
+    double endY = static_cast<double>(y);
+    double dist = std::hypot(endX - startX, endY - startY);
+    double angle = std::atan2(endY - startY, endX - startX);
+    angle = angle * 180.0 / M_PI;
+    //angle = 180.0-angle;
+    while (angle < -180.0) angle += 360;
+    while (angle > 180.0) angle -= 360;
+    turn_to_heading(angle, 1000, speed_limit);
+    drive_for(dist, timeout- 1000, speed_limit);
+}
+
+void Drivetrain::drive_to_reverse(double x, double y, double timeout, double speed_limit) {
+    double startX = static_cast<double>(bot::mcl::location.get_x());
+    double startY = static_cast<double>(bot::mcl::location.get_y());
+    double endX = static_cast<double>(x);
+    double endY = static_cast<double>(y);
+    double dist = std::hypot(endX - startX, endY - startY);
+    double angle = std::atan2(endY - startY, endX - startX);
+
+    angle = angle * 180.0 / M_PI;
+    angle = 180.0-angle;
+    while (angle < -180.0) angle += 360;
+    while (angle > 180.0) angle -= 360;
+    angle *= -1;
+    turn_to_heading(angle, 1000, speed_limit);
+    drive_for(-dist, timeout- 1000, speed_limit);
+}
+*/
+
+void Drivetrain::drive_to(double x, double y, double stop_dist, double timeout, double speed_limit) {
+
+
+    /*double kHeading = _pp_k_heading;
+    double kSlow = _pp_k_slow;
+    double heading_threshold = 1e-2;
+
+    double start_time = bot::Brain.Timer.time(vex::msec);
+
+    while (bot::Brain.Timer.time(vex::msec) - start_time < timeout) {
+
+        
+        double current_x = location.get_x();
+        double current_y = location.get_y();
+        double current_heading = static_cast<double>(location.get_heading());
+        
+        double dx = x - current_x;
+        double dy = y - current_y;
+        double dist = std::hypot(dx, dy);
+
+        double slowdown = dist * kSlow;
+        slowdown = math::clamp(slowdown, 0.0, 1.0);
+
+        if (dist < stop_dist) {
+            _left_motor.stop();
+            _right_motor.stop();
+            return;
+        }
+
+        double tx = dx/dist;
+        double ty = dy/dist;
+
+        if (prev_poses.size() < 1) {
+            prev_poses.push_back({current_x, current_y, current_heading});
+            continue;
+        }
+        double prev_x = prev_poses[0].x;
+        double prev_y = prev_poses[0].y;
+        double vx = current_x - prev_x;
+        double vy = current_y - prev_y;
+        double vmag = std::hypot(vx, vy);
+        
+        double rx, ry;
+
+        if (vmag > heading_threshold) {
+            rx = vx/vmag;
+            ry = vy/vmag;
+        } else {
+            rx = tx;
+            ry = ty;
+        }
+
+        double error = rx * ty - ry * tx;
+
+
+
+        double left_output = 0.67 * speed_limit - kHeading * error;
+        double right_output = 0.67 * speed_limit + kHeading * error;
+
+        left_output *= slowdown;
+        right_output *= slowdown;
+
+        left_output = math::clamp(left_output, -speed_limit, speed_limit);
+        right_output = math::clamp(right_output, -speed_limit, speed_limit);
+        printf("dist: %.2f\n", dist);
+        printf("Error: %.2f\n", error);
+        printf("Left Output: %.2f, Right Output: %.2f\n", left_output, right_output);
+        tank_drive(left_output, right_output);
+        vex::task::sleep(static_cast<int>(PP_DT * 1000));
+    }
+    _left_motor.stop();
+    _right_motor.stop();
+    return;*/
+}
+
+void Drivetrain::drive_to_reverse(double x, double y, double stop_dist, double timeout, double speed_limit){
+    std::vector<Pose> prev_poses = {};
+
+    prev_poses.push_back({
+        static_cast<double>(bot::mcl::location.get_x()),
+        static_cast<double>(bot::mcl::location.get_y()),
+        static_cast<double>(bot::mcl::location.get_heading())
+    });
+
+    double kHeading = _pp_k_heading;
+    double kSlow = _pp_k_slow;
+    double heading_threshold = 1e-2;
+
+    double start_time = bot::Brain.Timer.time(vex::msec);
+
+    while (bot::Brain.Timer.time(vex::msec) - start_time < timeout) {
+        double current_x = bot::mcl::location.get_x();
+        double current_y = bot::mcl::location.get_y();
+        double current_heading = static_cast<double>(bot::mcl::location.get_heading());
+        prev_poses.push_back({current_x, current_y, current_heading});
+        if (prev_poses.size() > 5) prev_poses.erase(prev_poses.begin());
+
+        double dx = x - current_x;
+        double dy = y - current_y;
+        double dist = std::hypot(dx, dy);
+
+        if (dist < stop_dist) {
+            _left_motor.stop();
+            _right_motor.stop();
+            return;
+        }
+
+        double tx = dx/dist;
+        double ty = dy/dist;
+        
+        tx *= -1;
+        ty *= -1; 
+
+        double vx = current_x - prev_poses[0].x;
+        double vy = current_y - prev_poses[0].y;
+        double vmag = std::hypot(vx, vy);
+        
+        double rx, ry;
+
+        if (vmag > heading_threshold) {
+            rx = vx/vmag;
+            ry = vy/vmag;
+        } else {
+            rx = tx;
+            ry = ty;
+        }
+
+        double error = rx * ty - ry * tx;
+
+        double slowdown = dist * kSlow;
+        slowdown = math::clamp(slowdown, 0.0, 1.0);
+
+        double left_output = 0.67 * speed_limit - kHeading * error;
+        double right_output = 0.67 * speed_limit + kHeading * error;
+
+        left_output *= slowdown;
+        right_output *= slowdown;
+
+        left_output = math::clamp(left_output, -speed_limit, speed_limit);
+        right_output = math::clamp(right_output, -speed_limit, speed_limit);
+        
+        tank_drive(-left_output, -right_output);
+        vex::task::sleep(static_cast<int>(PP_DT * 1000));
+    }
+
+    _left_motor.stop();
+    _right_motor.stop();
+    return;
 }
 
 double Drivetrain::get_left_encoder() {
@@ -430,4 +763,20 @@ double Drivetrain::get_left_encoder() {
 
 double Drivetrain::get_right_encoder() {
     return _right_motor.position(vex::degrees);
+}
+
+void Drivetrain::set_pp_k_heading(double k_heading) {
+    _pp_k_heading = k_heading;
+}
+
+void Drivetrain::set_pp_k_slow(double k_slow) {
+    _pp_k_slow = k_slow;
+}
+
+void Drivetrain::set_pp_max_curv_speed_factor(double factor) {
+    _pp_max_curv_speed_factor = factor;
+}
+
+void Drivetrain::set_pp_min_speed_pct(double pct) {
+    _pp_min_speed_pct = pct;
 }

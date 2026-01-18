@@ -63,6 +63,12 @@ void Location::reset(std::int16_t x, std::int16_t y, std::int16_t heading) {
     _bestParticle.x = x;
     _bestParticle.y = y;
     _bestParticle.heading = heading;
+    
+    // Reset jump filtering state
+    _consecutiveJumpCount = 0;
+    for (int i = 0; i < 3; i++) {
+        _jumpHistory[i] = {x, y};
+    }
 }
 
 std::int16_t Location::get_x() {
@@ -338,11 +344,69 @@ void Location::update() {
     Reading readings = capture_readings();
     search(guess, readings);
     
+    // Calculate distance from current position to proposed new position
+    double jumpDist = std::hypot(
+        static_cast<double>(_bestParticle.x - _x),
+        static_cast<double>(_bestParticle.y - _y)
+    );
+    
+    bool acceptUpdate = true;
+    
+    if (jumpDist > JUMP_THRESHOLD) {
+        // Large jump detected - check if it's consistent with recent jump candidates
+        
+        // Shift history and add new candidate
+        _jumpHistory[2] = _jumpHistory[1];
+        _jumpHistory[1] = _jumpHistory[0];
+        _jumpHistory[0] = {_bestParticle.x, _bestParticle.y};
+        _consecutiveJumpCount++;
+        
+        if (_consecutiveJumpCount >= REQUIRED_CONSECUTIVE_JUMPS) {
+            // Check if all 3 jump candidates form a tight cluster
+            double dist01 = std::hypot(
+                static_cast<double>(_jumpHistory[0].x - _jumpHistory[1].x),
+                static_cast<double>(_jumpHistory[0].y - _jumpHistory[1].y)
+            );
+            double dist02 = std::hypot(
+                static_cast<double>(_jumpHistory[0].x - _jumpHistory[2].x),
+                static_cast<double>(_jumpHistory[0].y - _jumpHistory[2].y)
+            );
+            double dist12 = std::hypot(
+                static_cast<double>(_jumpHistory[1].x - _jumpHistory[2].x),
+                static_cast<double>(_jumpHistory[1].y - _jumpHistory[2].y)
+            );
+            
+            // All three candidates must be within CLUSTER_RADIUS of each other
+            if (dist01 <= CLUSTER_RADIUS && dist02 <= CLUSTER_RADIUS && dist12 <= CLUSTER_RADIUS) {
+                // Consistent cluster - accept the jump and reset counter
+                _consecutiveJumpCount = 0;
+                acceptUpdate = true;
+            } else {
+                // Not a consistent cluster - reject and keep waiting
+                acceptUpdate = false;
+            }
+        } else {
+            // Not enough consecutive jumps yet - reject this update
+            acceptUpdate = false;
+        }
+    } else {
+        // Normal small movement - reset jump counter
+        _consecutiveJumpCount = 0;
+    }
+    
     // Lock mutex when updating shared position data
     _positionMutex.lock();
-    _x = _bestParticle.x;
-    _y = _bestParticle.y;
-    _heading = _bestParticle.heading;
+    if (acceptUpdate) {
+        // Use particle filter result
+        _x = _bestParticle.x;
+        _y = _bestParticle.y;
+        _heading = _bestParticle.heading;
+    } else {
+        // Jump rejected - use encoder guess as fallback
+        _x = guess.x;
+        _y = guess.y;
+        _heading = guess.heading;
+    }
     _positionMutex.unlock();
 }
 
@@ -507,7 +571,7 @@ void Location::search(Particle guess, Reading readings) {
                 if (!use_sensor && adjusted_diff > 500) return 0;
                 
                 validSensorCount++;
-                float base_weight = use_sensor ? 1.0f : 0.4f;
+                float base_weight = use_sensor ? 1.0f : 0.2f;
                 return static_cast<uint32_t>(adjusted_diff * base_weight * sensor_weight);
             };
 
@@ -626,7 +690,7 @@ void Location::search(Particle guess, Reading readings) {
                     int adj_diff = std::max(0, diff - deadband);
                     if (!use_sensor && adj_diff > 500) return 0;
                     gradientValidCount++;
-                    return static_cast<uint32_t>(adj_diff * (use_sensor ? 1.0f : 0.4f) * sensor_weight);
+                    return static_cast<uint32_t>(adj_diff * (use_sensor ? 1.0f : 0.2f) * sensor_weight);
                 };
                 
                 gradientError += get_grad_err(gd_fl, readings.front_left, g_front, gw_fl);

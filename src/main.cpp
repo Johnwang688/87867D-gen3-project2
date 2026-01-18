@@ -29,12 +29,15 @@ using namespace bot;
 /*---------------------------------------------------------------------------*/
 
 void pre_auton(void) {
-    bot::sensors::imu.calibrate();
-    bot::mcl::location.reset(0, 1500, 
-      static_cast<std::int16_t>(std::round(bot::sensors::imu.get_heading())) + 90);
-    bot::mcl::location.start();
-    printf("IMU: %.2f\n", bot::sensors::imu.get_heading());
-    printf("Location: %d, %d, %d\n", bot::mcl::location.get_x(), bot::mcl::location.get_y(), bot::mcl::location.get_heading());
+    bot::sensors::left_imu.calibrate();
+    bot::sensors::right_imu.calibrate();
+    while (bot::sensors::left_imu.isCalibrating() || bot::sensors::right_imu.isCalibrating()) {
+        vex::task::sleep(10);
+    }
+    //bot::mcl::location.reset(400, 1200, 90.0);
+    //bot::mcl::location.start();
+    //printf("IMU: %.2f\n", bot::sensors::imu.get_heading());
+    //printf("Location: %d, %d, %d\n", bot::mcl::location.get_x(), bot::mcl::location.get_y(), bot::mcl::location.get_heading());
     return;
   // All activities that occur before the competition starts
   // Example: clearing encoders, setting servo positions, ...
@@ -54,7 +57,7 @@ void autonomous(void) {
   // ..........................................................................
   // Insert autonomous user code here.
   // ..........................................................................
-  bot::auton::test();
+  bot::auton::left_9();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -69,6 +72,8 @@ void autonomous(void) {
 
 void usercontrol(void) {
 
+  bot::drivetrains::dt.coast();
+
   //bot::sensors::imu.calibrate();
   //vex::task::sleep(500);
   
@@ -78,7 +83,7 @@ void usercontrol(void) {
   //bot::mcl::location.reset(300, -1200, 0);
   //bot::mcl::location.start();
 
-  //bot::pistons::toggle_arm_piston();
+  bot::pistons::toggle_arm_piston();
 
   bot::Controller1.ButtonL1.pressed(bot::buttons::ButtonL1);
   bot::Controller1.ButtonL1.released(bot::buttons::ButtonL1_released);
@@ -116,8 +121,8 @@ void usercontrol(void) {
     right_joystick = sqrt(rightY * rightY + rightX * rightX);
 
 
-    left_joystick = math::curve(left_joystick);
-    right_joystick = math::curve(right_joystick);
+    //left_joystick = math::curve(left_joystick);
+    //right_joystick = math::curve(right_joystick);
 
     // deadzone adjustment
     if (fabs(left_joystick) < CONTROLLER_DEADZONE) left_joystick = 0.0;

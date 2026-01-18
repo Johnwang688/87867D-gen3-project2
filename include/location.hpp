@@ -54,4 +54,12 @@ class Location {
         float calculate_intersection(float s_x, float s_y, float angle_deg, const Line& wall);
         bool is_particle_valid(const Particle& particle);
         static int _updateTaskWrapper(void* instance);
+        
+        // Jump filtering: prevent random large position jumps
+        static constexpr double JUMP_THRESHOLD = 400.0;  // mm
+        static constexpr double CLUSTER_RADIUS = 200.0;  // mm - jumps must be within this distance of each other
+        static constexpr int REQUIRED_CONSECUTIVE_JUMPS = 3;
+        struct JumpCandidate { int16_t x; int16_t y; };
+        JumpCandidate _jumpHistory[3] = {{0, 0}, {0, 0}, {0, 0}};
+        int _consecutiveJumpCount = 0;
 };

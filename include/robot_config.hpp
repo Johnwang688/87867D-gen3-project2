@@ -45,6 +45,10 @@ namespace bot {
                         vex::task::sleep(10);
                     }
                 }
+                void set_heading(double heading) {
+                    _imu_left.setHeading(heading, vex::degrees);
+                    _imu_right.setHeading(heading, vex::degrees);
+                }
                 double get_heading() {
                     double right_rad = _imu_right.heading(vex::degrees) * M_PI / 180.0;
                     double left_rad = _imu_left.heading(vex::degrees) * M_PI / 180.0;

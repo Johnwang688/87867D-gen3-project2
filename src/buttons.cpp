@@ -137,13 +137,13 @@ namespace bot {
             //bot::intake_methods::stop_intaking();
         }
         void ButtonA(){
-            debug::print_sensor_data();
+            //debug::print_sensor_data();
         }
         void ButtonB(){
             bot::pistons::toggle_match_load_piston();
         }
         void ButtonLeft(){
-            debug::print_location();
+            //debug::print_location();
         }
         void ButtonRight(){
 
