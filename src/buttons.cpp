@@ -94,11 +94,12 @@ namespace bot {
         using namespace bot::pistons;
 
         void ButtonL1(){
-            bot::pistons::toggle_arm_piston();
+            bot::pistons::arm_piston.set(true);
             //bot::motors::upper.spin(vex::forward, 100, vex::percent);
             //bot::motors::mid.spin(vex::forward, 50, vex::percent);
         }
         void ButtonL1_released(){
+            bot::pistons::arm_piston.set(false);
             //bot::motors::upper.stop();
             //bot::motors::mid.stop();
         }

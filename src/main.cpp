@@ -57,7 +57,7 @@ void autonomous(void) {
   // ..........................................................................
   // Insert autonomous user code here.
   // ..........................................................................
-  bot::auton::left_9();
+  bot::auton::left_4();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -83,7 +83,7 @@ void usercontrol(void) {
   //bot::mcl::location.reset(300, -1200, 0);
   //bot::mcl::location.start();
 
-  bot::pistons::toggle_arm_piston();
+  //bot::pistons::toggle_arm_piston();
 
   bot::Controller1.ButtonL1.pressed(bot::buttons::ButtonL1);
   bot::Controller1.ButtonL1.released(bot::buttons::ButtonL1_released);

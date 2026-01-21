@@ -12,6 +12,7 @@ namespace bot {
         void right_long();
         void right_7();
         void left_4_mid_3_long();
+        void left_4();
         void sawp();
         void skills();
         void test();
