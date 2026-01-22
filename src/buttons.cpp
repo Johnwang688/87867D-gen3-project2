@@ -94,12 +94,12 @@ namespace bot {
         using namespace bot::pistons;
 
         void ButtonL1(){
-            bot::pistons::arm_piston.set(true);
+            bot::pistons::arm_piston.set(false);
             //bot::motors::upper.spin(vex::forward, 100, vex::percent);
             //bot::motors::mid.spin(vex::forward, 50, vex::percent);
         }
         void ButtonL1_released(){
-            bot::pistons::arm_piston.set(false);
+            bot::pistons::arm_piston.set(true);
             //bot::motors::upper.stop();
             //bot::motors::mid.stop();
         }
@@ -114,16 +114,16 @@ namespace bot {
             //bot::motors::mid.stop();
         }
         void ButtonR1(){
-            bot::intake_methods::intake();
+            bot::motors::lower.spin(vex::forward, 100, vex::percent);
         }
         void ButtonR1_released(){
-            bot::intake_methods::stop_intaking();
+            bot::motors::lower.stop();
         }
         void ButtonR2(){
-            bot::intake_methods::outtake();
+            bot::motors::lower.spin(vex::reverse, 100, vex::percent);
         }
         void ButtonR2_released(){
-            bot::intake_methods::stop_outtaking();
+            bot::motors::lower.stop();
         }
         void ButtonX(){
             bot::display_temperature();

@@ -57,7 +57,7 @@ void autonomous(void) {
   // ..........................................................................
   // Insert autonomous user code here.
   // ..........................................................................
-  bot::auton::left_4();
+  bot::auton::test();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -121,8 +121,8 @@ void usercontrol(void) {
     right_joystick = sqrt(rightY * rightY + rightX * rightX);
 
 
-    //left_joystick = math::curve(left_joystick);
-    //right_joystick = math::curve(right_joystick);
+    left_joystick = math::curve(left_joystick);
+    right_joystick = math::curve(right_joystick);
 
     // deadzone adjustment
     if (fabs(left_joystick) < CONTROLLER_DEADZONE) left_joystick = 0.0;
