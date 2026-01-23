@@ -114,16 +114,16 @@ namespace bot {
             //bot::motors::mid.stop();
         }
         void ButtonR1(){
-            bot::motors::lower.spin(vex::forward, 100, vex::percent);
+            bot::intake_methods::intake();
         }
         void ButtonR1_released(){
-            bot::motors::lower.stop();
+            bot::intake_methods::stop_intaking();
         }
         void ButtonR2(){
-            bot::motors::lower.spin(vex::reverse, 100, vex::percent);
+            bot::intake_methods::outtake();
         }
         void ButtonR2_released(){
-            bot::motors::lower.stop();
+            bot::intake_methods::stop_outtaking();
         }
         void ButtonX(){
             bot::display_temperature();

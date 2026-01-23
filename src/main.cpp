@@ -57,7 +57,7 @@ void autonomous(void) {
   // ..........................................................................
   // Insert autonomous user code here.
   // ..........................................................................
-  bot::auton::test();
+  bot::auton::sawp();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -73,6 +73,9 @@ void autonomous(void) {
 void usercontrol(void) {
 
   bot::drivetrains::dt.coast();
+  bot::motors::left_dt.stop();
+  bot::motors::right_dt.stop();
+  bot::motors::intake.stop();
 
   //bot::sensors::imu.calibrate();
   //vex::task::sleep(500);
