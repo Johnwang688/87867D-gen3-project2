@@ -57,7 +57,7 @@ void autonomous(void) {
   // ..........................................................................
   // Insert autonomous user code here.
   // ..........................................................................
-  bot::auton::sawp();
+  bot::auton::left_4_mid_3_long();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -70,6 +70,8 @@ void autonomous(void) {
 /*  You must modify the code to add your own robot specific commands here.   */
 /*---------------------------------------------------------------------------*/
 
+
+constexpr double MIN_OUTPUT = 30.0;
 void usercontrol(void) {
 
   bot::drivetrains::dt.coast();
@@ -124,18 +126,27 @@ void usercontrol(void) {
     right_joystick = sqrt(rightY * rightY + rightX * rightX);
 
 
-    left_joystick = math::curve(left_joystick);
-    right_joystick = math::curve(right_joystick);
+    left_joystick = A * std::pow(B, left_joystick) + C;
+    right_joystick = A * std::pow(B, right_joystick) + C;
 
     // deadzone adjustment
-    if (fabs(left_joystick) < CONTROLLER_DEADZONE) left_joystick = 0.0;
-    if (fabs(right_joystick) < CONTROLLER_DEADZONE) right_joystick = 0.0;
-     
+    if (fabs(left_joystick) < CONTROLLER_DEADZONE) {left_joystick = 0.0;}
+    if (fabs(right_joystick) < CONTROLLER_DEADZONE) {right_joystick = 0.0;}
+    
     left = (leftY < 0) ? -left_joystick : left_joystick;
     right = (rightY < 0) ? -right_joystick : right_joystick;
 
     left = math::clamp(left, -100, 100);
     right = math::clamp(right, -100, 100);
+
+    if (std::abs(left) < MIN_OUTPUT){
+      if (std::abs(left) < CONTROLLER_DEADZONE) {left = 0.0;}
+      else {left = (left < 0) ? -MIN_OUTPUT : MIN_OUTPUT;}
+    }
+    if (std::abs(right) < MIN_OUTPUT){
+      if (std::abs(right) < CONTROLLER_DEADZONE) {right = 0.0;}
+      else {right = (right < 0) ? -MIN_OUTPUT : MIN_OUTPUT;}
+    }
 
     bot::drivetrains::dt.tank_drive(left, right);
 

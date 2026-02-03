@@ -16,6 +16,7 @@ namespace bot {
         void sawp();
         void skills();
         void test();
+        void skills_2();
     }
 
     namespace drivetrains {

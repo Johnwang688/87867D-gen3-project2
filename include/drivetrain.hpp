@@ -18,6 +18,7 @@ class Drivetrain {
         
         void drive_for(double distance, double timeout, double speed_limit);
         void drive_for(double distance, double timeout, double speed_limit, double target_heading);
+        void drive(double distance, double timeout, double speed_limit, double target_heading);
         void turn_to_heading(double heading, double timeout, double speed_limit);
         void turn_to_heading(double heading, double timeout, double speed_limit, bool settle);
         void drive_to(double x, double y, double stop_dist, double timeout, double speed_limit);

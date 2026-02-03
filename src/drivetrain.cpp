@@ -264,6 +264,36 @@ void Drivetrain::drive_for(double distance, double timeout, double speed_limit, 
     _right_motor.spin(forward, 0, vex::voltageUnits::volt);
 }
 
+void Drivetrain::drive(double distance, double timeout, double speed_limit, double target_heading) {
+    double start_time = bot::Brain.Timer.time(vex::msec);
+    double heading_error, heading_correction, current_pos, position_error, left_speed, right_speed, direction;
+    _left_motor.setPosition(0, vex::degrees);
+    _right_motor.setPosition(0, vex::degrees);
+    _heading_pid.reset();
+
+    double dist = helpers::mmToDegrees(distance);
+    while (timeout > 0 && bot::Brain.Timer.time(vex::msec) - start_time < timeout) {
+        heading_error = helpers::angular_difference(bot::sensors::left_imu.heading(vex::degrees), target_heading);
+        heading_correction = _heading_pid.compute(heading_error, 0.0, 0.01);
+        current_pos = (_left_motor.position(vex::degrees) + _right_motor.position(vex::degrees)) / 2.0;
+        position_error = dist - current_pos;
+        direction = position_error > 0 ? 1 : -1;
+        left_speed = direction * speed_limit + heading_correction;
+        right_speed = direction * speed_limit - heading_correction;
+        left_speed = math::clamp(left_speed, -speed_limit, speed_limit);
+        right_speed = math::clamp(right_speed, -speed_limit, speed_limit);
+        left_speed *= (_max_voltage / 100.0);
+        right_speed *= (_max_voltage / 100.0);
+        _left_motor.spin(forward, left_speed, vex::voltageUnits::volt);
+        _right_motor.spin(forward, right_speed, vex::voltageUnits::volt);
+ 
+        if (std::abs(position_error) < (distance / 10.0)) break;
+        vex::task::sleep(10);
+    }
+    _left_motor.stop();
+    _right_motor.stop();
+}
+
 void Drivetrain::arcade_drive(double fwd, double turn) {
     double leftSpeed = fwd + turn;
     double rightSpeed = fwd - turn;

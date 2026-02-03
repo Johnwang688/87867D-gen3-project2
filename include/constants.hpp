@@ -50,7 +50,7 @@ constexpr double MAX_ACCEL = 3.5;
 
 // driver sens constants
 constexpr double A = 2.0;
-constexpr double B = 1.04;
+constexpr double B = 1.05;
 constexpr double C = -A;
 
 // Particle filter constants
